@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GhostDOM — Server-Driven UI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <aside id="devtools" class="devtools devtools--hidden" aria-label="GhostDOM devtools">
+      <h2>Devtools</h2>
+      <p class="devtools-hint">VDOM and patches streamed from the server (display only).</p>
+      <section>
+        <h3>Last VDOM (wire)</h3>
+        <pre id="devtools-vdom" class="devtools-pre"></pre>
+      </section>
+      <section>
+        <h3>Last patch</h3>
+        <pre id="devtools-patch" class="devtools-pre"></pre>
+      </section>
+    </aside>
+    <script src="/client.js"></script>
+  </body>
+</html>

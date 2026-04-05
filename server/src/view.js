@@ -19,7 +19,10 @@ function view(state, opts = {}) {
     { id: "root", class: "app" },
     [
       h("h1", { id: "title" }, ["GhostDOM"]),
-      h("p", { id: "label" }, ["Count: ", String(state.count)]),
+      h("p", { id: "label" }, [
+        "Count: ",
+        h("span", { id: "label-count" }, [String(state.count)]),
+      ]),
       h(
         "button",
         {

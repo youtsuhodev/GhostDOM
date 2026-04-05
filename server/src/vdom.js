@@ -2,14 +2,27 @@
  * Virtual DOM builder for the server.
  *
  * - h(tag, attrs, children) builds element nodes.
- * - text(str) builds text leaves.
+ * - text(str) builds text leaves (ids are structural for leaves only — see README).
  * - Server-only attrs (onClick, key) are stripped from the wire format via serialize().
  *
- * Auto-ID policy: explicit attrs.id > attrs.key as k_${key} > structural path a_0_1_0
- * (stable as long as the tree shape and h() call order stay the same).
+ * Rule (MVP, enforced): every h() node MUST set attrs.id or attrs.key.
+ * Auto-ids for elements are disabled so list reorder cannot silently remap element identity.
  */
 
 const SERVER_ATTRS = new Set(["onClick", "key"]);
+
+/**
+ * @param {Record<string, unknown>} attrs
+ * @returns {string}
+ */
+function resolveElementId(attrs) {
+  if (attrs.id != null && attrs.id !== "") return String(attrs.id);
+  if (attrs.key != null && attrs.key !== "") return `k_${String(attrs.key)}`;
+  throw new Error(
+    '[GhostDOM] VDOM: every h() element must set attrs.id or attrs.key. ' +
+      "Without them, reordering children can corrupt identity and event routing.",
+  );
+}
 
 /**
  * @returns {{ h: Function, text: Function }}
@@ -21,17 +34,13 @@ function createRenderContext() {
     return "a_" + stack.join("_");
   }
 
-  function resolveId(attrs) {
-    if (attrs.id != null && attrs.id !== "") return String(attrs.id);
-    if (attrs.key != null && attrs.key !== "") return `k_${String(attrs.key)}`;
-    return autoPathId();
-  }
-
   /**
+   * Text leaves only: structural id (not used for event targets; avoid reordering text siblings
+   * without wrapping in h('span', { id | key }, …) if that list is dynamic).
    * @param {string} str
    */
   function text(str) {
-    const id = resolveId({});
+    const id = autoPathId();
     stack[stack.length - 1]++;
     return { id, text: str };
   }
@@ -42,7 +51,7 @@ function createRenderContext() {
    * @param {unknown[]} rawChildren
    */
   function h(tag, attrs = {}, rawChildren = []) {
-    const id = resolveId(attrs);
+    const id = resolveElementId(attrs);
     const node = {
       id,
       tag,

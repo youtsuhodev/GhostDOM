@@ -49,9 +49,14 @@ client (vanilla)          server (Node.js)
 - **`server/src/vdom.js`** exposes `createRenderContext()` → `h(tag, attrs, children)` and `text(str)`.
 - **Wire format**: `onClick` and `key` are **not** sent to the client; they are server-only hints for routing and stable IDs.
 
-### Auto-generated `id`
+### Element identity (`id` / `key`) — **required**
 
-Priority: explicit `attrs.id` → `attrs.key` as `k_${key}` → structural path `a_0_1_0` derived from the order of `h()` / `text()` calls during a render. Same tree shape and call order → stable ids across renders. Reordering children without explicit `id`/`key` can remap auto-ids—use explicit ids for anything wired to the event router.
+**Rule:** every `h()` call **must** set **`attrs.id`** or **`attrs.key`** (non-empty). The runtime **throws** if neither is set. Auto-generated ids for **elements** are intentionally disabled: reordering a list without stable keys remaps node identity and breaks diffs and `targetId` routing.
+
+- **`id`** — stable wire / DOM id (what the client sends back as `targetId` when applicable).
+- **`key`** — server-only; becomes vnode id `k_${key}` on the wire (still stable across renders for that logical item). Stripped from HTML attributes in `serialize()`.
+
+**Text leaves** from string children still get structural ids (`a_0_1_0` style) for patching. For **dynamic lists of text**, wrap segments in `h("span", { id: "…" })` or `{ key: "…" }` so reordering stays safe.
 
 ## Diffing (MVP)
 
@@ -123,6 +128,7 @@ Changing **`server/src/view.js`** or **`server/src/handlers.js`** triggers a cac
 
 ## Pitfalls (by design)
 
+- **`h()` must declare `id` or `key`** — enforced at runtime; dynamic lists without keys are a footgun for reorder + event routing.
 - **Do not** grow a “smart” client—any reconciliation or business rules belong on the server.
 - **Do not** chase a perfect diff algorithm until the protocol and sessions are stable; extend ops incrementally.
 - **Sanitize** tags/attributes if trees ever come from untrusted sources (this MVP assumes trusted server output).

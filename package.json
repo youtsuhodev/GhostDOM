@@ -1,0 +1,15 @@
+{
+  "name": "ghostdom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-Driven UI Runtime MVP — virtual DOM and patches over WebSocket",
+  "scripts": {
+    "start": "node server/src/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

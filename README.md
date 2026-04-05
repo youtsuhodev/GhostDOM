@@ -1,2 +1,130 @@
 # GhostDOM
 
+Experimental **Server-Driven UI Runtime** (MVP): the server owns state, builds a virtual DOM, diffs updates, and pushes minimal patches over a WebSocket. The browser is a thin layer that applies patches and forwards DOM events—**no application logic** on the client.
+
+## Quick start
+
+```bash
+npm install
+npm start
+```
+
+Open [http://127.0.0.1:3456/](http://127.0.0.1:3456/). Use two tabs to see **independent sessions** (each connection gets its own counter state).
+
+### Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `PORT` | HTTP + WebSocket port (default `3456`) |
+| `NODE_ENV=production` | Disables devtools WebSocket and default hot reload |
+| `GHOSTDOM_DEVTOOLS=0` | Disables devtools even in development |
+| `GHOSTDOM_DEVTOOLS=1` | Forces devtools WebSocket on |
+| `GHOSTDOM_HOT_RELOAD=1` | Enables `fs.watch` reload of `view.js` / `handlers.js` |
+| `GHOSTDOM_HOT_RELOAD=0` | Disables hot reload even in development |
+
+In development (when `NODE_ENV` is not `production`), **hot reload** is on unless `GHOSTDOM_HOT_RELOAD=0`.
+
+### Devtools UI
+
+Open [http://127.0.0.1:3456/?devtools=1](http://127.0.0.1:3456/?devtools=1). The page opens a **second** WebSocket (`/ws?devtools=1`) that receives `devtoolsVdom` and `devtoolsPatch` messages (display only—still no client-side app logic).
+
+## Architecture
+
+```
+client (vanilla)          server (Node.js)
+     |                          |
+     |------ WebSocket ---------|
+     |  init / patch / error    |
+     |  event (click, input)    |
+     v                          v
+ apply ops to DOM         view(state) -> VDOM
+ + event delegation       diff(prev, next) -> ops
+                          handlers[targetId:event]
+```
+
+## Virtual DOM (server)
+
+- **Elements**: `{ id, tag, attrs, children }`
+- **Text**: `{ id, text }` (no `tag`)
+- **`server/src/vdom.js`** exposes `createRenderContext()` → `h(tag, attrs, children)` and `text(str)`.
+- **Wire format**: `onClick` and `key` are **not** sent to the client; they are server-only hints for routing and stable IDs.
+
+### Auto-generated `id`
+
+Priority: explicit `attrs.id` → `attrs.key` as `k_${key}` → structural path `a_0_1_0` derived from the order of `h()` / `text()` calls during a render. Same tree shape and call order → stable ids across renders. Reordering children without explicit `id`/`key` can remap auto-ids—use explicit ids for anything wired to the event router.
+
+## Diffing (MVP)
+
+Implemented in **`server/src/diff.js`**:
+
+- Same text node id → `setText` if content changed.
+- Same element id → compare **wire** attributes → `setAttrs` with the **full** next wire attribute set (so removed attributes disappear on the client).
+- **Children**:
+  - If `children.length` differs → `replaceChildren` on that parent (client rebuilds that subtree).
+  - If the length matches but any child slot differs in kind or id → `replaceChildren`.
+  - Otherwise recurse index-by-index.
+
+This favors clarity over a minimal op sequence for arbitrary trees.
+
+## Event routing
+
+**`server/src/handlers.js`** exports a map:
+
+- Key: `` `${targetId}:${eventName}` `` (e.g. `btn-inc:click`)
+- Value: `(session, detail) => { ... }` — mutate `session.state`, then rely on **`queueUpdate(session)`** (already invoked by `Session.handleEvent` after the handler).
+
+The view assigns stable `data-sdui-id` on the client via `id` on each node; the client resolves the nearest ancestor with `data-sdui-id` and sends `targetId`.
+
+## Render loop (batching)
+
+**`server/src/renderLoop.js`** maintains a **dirty set** of sessions. `queueUpdate(session)` schedules **`setImmediate(flushAll)`**. Multiple state changes in the same turn collapse into **one flush batch** per macrotick where possible.
+
+## Latency UX (server-driven)
+
+On each user `event`, `Session` sets **`uiPending`**. The first flushed tree after that includes `disabled` / `aria-busy` on buttons; the next flush clears them. No extra logic in the browser beyond applying attributes from patches.
+
+## Hot reload (development)
+
+Changing **`server/src/view.js`** or **`server/src/handlers.js`** triggers a cache bust and reload. Every live session gets **`prevTree` cleared** and a fresh **`init`** on the next flush so structure and handlers stay consistent. Events that arrive mid-reload use the current code path after reload; this is best-effort for a demo.
+
+## Project layout
+
+| Path | Role |
+|------|------|
+| `server/src/index.js` | HTTP static server, WebSocket upgrade, session lifecycle |
+| `server/src/renderLoop.js` | `queueUpdate` / `flushAll` |
+| `server/src/session.js` | Per-connection state, flush, devtools broadcast hook |
+| `server/src/vdom.js` | `h`, `text`, `serialize`, `wireAttrs` |
+| `server/src/view.js` | `view(state, { uiPending })` |
+| `server/src/handlers.js` | Event router map |
+| `server/src/diff.js` | `diff(prev, next)` |
+| `server/src/hotReload.js` | `fs.watch` + `require.cache` bust |
+| `client/index.html` | Shell + optional devtools panel |
+| `client/client.js` | WebSocket client, patch applier, delegation |
+| `client/styles.css` | Basic styling |
+
+## Protocol (JSON)
+
+**Server → client**
+
+- `{ type: "init", sessionId, tree }`
+- `{ type: "patch", sessionId, ops }`
+- `{ type: "error", message }`
+- `{ type: "devtoolsVdom", sessionId, tree }` (devtools socket)
+- `{ type: "devtoolsPatch", sessionId, ops }` (devtools socket)
+
+**Client → server**
+
+- `{ type: "event", sessionId, name, targetId, detail? }`
+
+**Patch ops**
+
+- `{ op: "setText", id, text }`
+- `{ op: "setAttrs", id, attrs }` — full wire attribute replacement (except `data-sdui-id` preserved by the client)
+- `{ op: "replaceChildren", parentId, children }`
+
+## Pitfalls (by design)
+
+- **Do not** grow a “smart” client—any reconciliation or business rules belong on the server.
+- **Do not** chase a perfect diff algorithm until the protocol and sessions are stable; extend ops incrementally.
+- **Sanitize** tags/attributes if trees ever come from untrusted sources (this MVP assumes trusted server output).

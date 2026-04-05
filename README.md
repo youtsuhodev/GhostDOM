@@ -55,16 +55,13 @@ Priority: explicit `attrs.id` → `attrs.key` as `k_${key}` → structural path 
 
 ## Diffing (MVP)
 
-Implemented in **`server/src/diff.js`**:
+Implemented in **`server/src/diff.js`** with one rule:
 
-- Same text node id → `setText` if content changed.
-- Same element id → compare **wire** attributes → `setAttrs` with the **full** next wire attribute set (so removed attributes disappear on the client).
-- **Children**:
-  - If `children.length` differs → `replaceChildren` on that parent (client rebuilds that subtree).
-  - If the length matches but any child slot differs in kind or id → `replaceChildren`.
-  - Otherwise recurse index-by-index.
+- **Valid pair** (same `id`, same kind text/element, and same `tag` for elements) → update in place: `setText`, `setAttrs` (full wire attrs), then recurse into children.
+- **Otherwise** → `replaceChildren` on that parent with the **entire** next child list (one op, no partial sibling list).
+- **Root** has no parent: if the root cannot be paired, emit **`replaceRoot`** with the full serialized tree (client remounts under `#root`).
 
-This favors clarity over a minimal op sequence for arbitrary trees.
+This trims most structural edge cases: any mismatch at a child index forces a wholesale replace for that parent’s children.
 
 ## Event routing
 
@@ -122,6 +119,7 @@ Changing **`server/src/view.js`** or **`server/src/handlers.js`** triggers a cac
 - `{ op: "setText", id, text }`
 - `{ op: "setAttrs", id, attrs }` — full wire attribute replacement (except `data-sdui-id` preserved by the client)
 - `{ op: "replaceChildren", parentId, children }`
+- `{ op: "replaceRoot", tree }` — remount the app root (same as `init` DOM effect, without a new session)
 
 ## Pitfalls (by design)
 

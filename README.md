@@ -39,7 +39,7 @@ client (vanilla)          server (Node.js)
      v                          v
  apply ops to DOM         view(state) -> VDOM
  + event delegation       diff(prev, next) -> ops
-                          handlers[targetId:event]
+                          handlers[targetId:eventType]
 ```
 
 ## Virtual DOM (server)
@@ -67,7 +67,7 @@ This trims most structural edge cases: any mismatch at a child index forces a wh
 
 **`server/src/handlers.js`** exports a map:
 
-- Key: `` `${targetId}:${eventName}` `` (e.g. `btn-inc:click`)
+- Key: `` `${targetId}:${eventType}` `` (e.g. `btn-inc:click`)
 - Value: `(session, detail) => { ... }` — mutate `session.state`, then rely on **`queueUpdate(session)`** (already invoked by `Session.handleEvent` after the handler).
 
 The view assigns stable `data-sdui-id` on the client via `id` on each node; the client resolves the nearest ancestor with `data-sdui-id` and sends `targetId`.
@@ -110,9 +110,9 @@ Changing **`server/src/view.js`** or **`server/src/handlers.js`** triggers a cac
 - `{ type: "devtoolsVdom", sessionId, tree }` (devtools socket)
 - `{ type: "devtoolsPatch", sessionId, ops }` (devtools socket)
 
-**Client → server**
+**Client → server (UI)**
 
-- `{ type: "event", sessionId, name, targetId, detail? }`
+- `{ type: "<domEvent>", sessionId, targetId, detail? }` — top-level `type` is the interaction kind (`click`, `input`, `keydown`, `focus`, …), not a wrapper enum.
 
 **Patch ops**
 

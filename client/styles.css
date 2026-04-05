@@ -1,0 +1,88 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, sans-serif;
+  background: #0f1115;
+  color: #e8eaed;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+.app {
+  max-width: 32rem;
+}
+
+.app h1 {
+  margin-top: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app button {
+  margin-right: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #3c4048;
+  background: #1a1d24;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.devtools {
+  border-top: 1px solid #2a2f3a;
+  padding: 0.75rem 1rem 1.25rem;
+  background: #0b0d11;
+  max-height: 42vh;
+  overflow: auto;
+}
+
+.devtools--hidden {
+  display: none;
+}
+
+.devtools h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.devtools h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9aa0a6;
+}
+
+.devtools-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9aa0a6;
+}
+
+.devtools-pre {
+  margin: 0;
+  padding: 0.5rem;
+  background: #141820;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  overflow: auto;
+  max-height: 12rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
